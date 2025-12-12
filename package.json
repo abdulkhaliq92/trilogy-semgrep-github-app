@@ -1,0 +1,16 @@
+{
+  "name": "semgrep-github-app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "lambda.js",
+  "scripts": {
+    "start": "node lambda.js"
+  },
+  "dependencies": {
+    "probot": "^12.2.0",
+    "simple-git": "^3.19.1",
+    "uuid": "^9.0.0",
+    "serverless-http": "^3.2.0",
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,32 @@
+# Alternative Dockerfile using Docker Hub base image
+# Use this if public.ecr.aws has connectivity issues
+
+FROM node:18-slim
+
+# Install AWS Lambda Runtime Interface Emulator
+RUN apt-get update && \
+    apt-get install -y \
+    python3 \
+    python3-pip \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Semgrep
+RUN pip3 install --no-cache-dir semgrep
+
+# Install AWS Lambda Runtime Interface Client for Node.js
+WORKDIR /var/task
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev && \
+    npm install aws-lambda-ric
+
+# Copy app code
+COPY . .
+
+# Set Lambda-compatible environment
+ENV NODE_PATH=/var/task/node_modules
+
+# Lambda handler
+ENTRYPOINT ["/usr/local/bin/npx", "aws-lambda-ric"]
+CMD ["lambda.handler"]
