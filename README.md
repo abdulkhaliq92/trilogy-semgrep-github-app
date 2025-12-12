@@ -2,44 +2,11 @@
 
 **Automated Semgrep security scanning for 30,000+ repositories via GitHub App + AWS Lambda. Zero per-repo configuration.**
 
-## Why This Approach
+## Overview
 
-**Problem:** Managing GitHub Actions workflows across 30k+ repos requires adding/maintaining workflow files in every repository.
+GitHub App + AWS Lambda solution for organization-wide Semgrep scanning. Runs on every PR, blocks merge on security findings. No per-repo configuration needed.
 
-**Solution:** Single GitHub App installation covers all repositories automatically. Runs Semgrep on every PR, blocks merging on security findings.
-
-**Benefits:**
-- ✅ Organization-wide coverage with one installation
-- ✅ No workflow files to maintain
-- ✅ Serverless scaling (~$11/month for 9M requests)
-- ✅ OSS or Pro mode via environment variable
-
----
-
-## Architecture
-
-```
-PR Event → GitHub Webhook → Lambda → Clone Repo → Run Semgrep → GitHub Check (pass/fail)
-```
-
-**Flow:**
-1. PR opened/updated → webhook to Lambda
-2. Lambda creates "Semgrep" check (in_progress)
-3. Generates installation token, clones repo to `/tmp`
-4. Runs `semgrep ci --config p/ci` (OSS) or `--config auto` (Pro)
-5. Parses findings, creates inline annotations
-6. Updates check to success/failure (blocks merge if failed)
-
----
-
-## Repository Structure
-
-```
-├── Dockerfile      # Lambda container (Node.js, Python, Semgrep, git)
-├── app.js          # GitHub App logic + Semgrep execution
-├── lambda.js       # AWS Lambda handler
-└── package.json    # Dependencies
-```
+**Architecture:** `PR Event → Webhook → Lambda → Semgrep → GitHub Check`
 
 ---
 
@@ -247,31 +214,9 @@ aws logs tail /aws/lambda/semgrep-github-app --follow
 
 ## Verification
 
-### Test Webhook
-1. GitHub App → Advanced → Recent Deliveries → Redeliver
-2. Verify **200 OK** response
-3. Check CloudWatch logs: `aws logs tail /aws/lambda/semgrep-github-app --follow`
-
-### Test PR
-```javascript
-// Add vulnerable code
-app.post('/eval', (req, res) => {
-  const result = eval(req.body.code);  // Should trigger failure
-});
-```
-
-**Expected:**
-- Semgrep check appears in PR
-- Status: in_progress → failure
-- Inline annotations on vulnerable lines
-- Merge blocked
-
-**Fix and verify:**
-```bash
-# Remove eval(), push fix
-# Status should change to success
-# Merge allowed
-```
+1. GitHub App → Advanced → Recent Deliveries → Redeliver (verify 200 OK)
+2. Create test PR with `eval()` usage → should trigger failure
+3. Check CloudWatch: `aws logs tail /aws/lambda/semgrep-github-app --follow`
 
 ---
 
@@ -301,18 +246,10 @@ docker run -p 9000:8080 -e APP_ID=$APP_ID -e PRIVATE_KEY="$PRIVATE_KEY" -e WEBHO
 
 ---
 
-## Key Features
+## Notes
 
-- **Scalability:** Serverless Lambda, automatic scaling, no infrastructure management
-- **Security:** Short-lived tokens, webhook signature verification, ephemeral execution
-- **Updates:** Rebuild image → push to ECR → update Lambda (< 5 min, zero downtime)
-- **Cost:** ~$11/month for 9M requests (30k repos × 10 PRs/day)
-
-## Limitations
-
-- Fork PRs not supported (installation tokens can't access external forks)
-- Large monorepos may need increased Lambda timeout/memory
-- Centralized configuration (no per-repo customization)
+**Cost:** ~$11/month for 9M requests (30k repos × 10 PRs/day)  
+**Limitations:** Fork PRs not supported, large monorepos may need increased timeout
 
 ---
 
@@ -341,23 +278,4 @@ aws lambda update-function-code --function-name semgrep-github-app --image-uri $
 
 ---
 
-## FAQ
-
-**Q: Can I disable Semgrep on my PR?**  
-A: No, ensures consistent security coverage.
-
-**Q: False positive?**  
-A: Document in PR, request security team review.
-
-**Q: Scan duration?**  
-A: 30-60 seconds (most repos), up to 2 min (monorepos).
-
-**Q: Run locally?**  
-A: `pip install semgrep && semgrep --config p/ci .`
-
-**Q: Emergency deployment?**  
-A: Admins can bypass checks (document reason).
-
----
-
-**Maintained by:** Platform Engineering & Security Team
+**Run locally:** `pip install semgrep && semgrep --config p/ci .`
